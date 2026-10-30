@@ -16,6 +16,16 @@
       "iconURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/ios/VaultBridge/Assets.xcassets/AppIcon.appiconset/Icon-1024.png",
       "versions": [
         {
+          "version": "0.1.0.7",
+          "buildVersion": "7",
+          "date": "2026-10-30",
+          "localizedDescription": "* Restore add-credential SwiftUI declaration removed during legacy UI cleanup\n* Replace Reynard Keychain bridge with standalone Mozilla Firefox Sync client\n* catalog: publish VaultBridge 0.1.0.5",
+          "changelog": "* Restore add-credential SwiftUI declaration removed during legacy UI cleanup\n* Replace Reynard Keychain bridge with standalone Mozilla Firefox Sync client\n* catalog: publish VaultBridge 0.1.0.5",
+          "downloadURL": "https://github.com/soum91/vaultbridge/releases/download/vaultbridge-v0.1.0.7/VaultBridge.ipa",
+          "size": 482979,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "0.1.0.5",
           "buildVersion": "5",
           "date": "2026-10-30",
