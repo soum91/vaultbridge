@@ -2,6 +2,7 @@ import LocalAuthentication
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct AddCredentialView: View {
     let onSave: (VaultCredential) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
