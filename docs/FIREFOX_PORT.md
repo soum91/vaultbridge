@@ -5,6 +5,22 @@ Inspected branch head: `55eecc5b63114b0072bf14bd4c55acec01e3a40a` (October 26, 2
 
 This is an integration specification, **not** a claim that Mozilla sign-in or password refresh already works in VaultBridge.
 
+## Current iOS bridge experiment
+
+The iOS preview now has a read-only, opt-in connector for the **existing local
+Reynard Sync Keychain record**. It uses exactly the service
+`com.minh-ton.Reynard.SyncedLogins`, account `firefox`, and Reynard's own
+shared Keychain access group. The apps **must be signed under the same Apple
+team**, with entitlements accepted by iOS. The bridge decodes Reynard's current
+`SyncedLogin` schema, imports records by remote GUID, and replaces previously
+synced records only after a complete successful Keychain read and parse.
+
+This relies on Reynard to log into Firefox, fetch and decrypt records; it does
+not authenticate with Mozilla itself. VaultBridge checks for refreshed records
+when its scene becomes active. It is **not background cloud sync** and not yet
+verified on the user's signed iPhone. If the signing team is different or the
+entitlement was stripped, the app explains that it cannot access the store.
+
 ## Confirmed existing components
 
 | Reynard source file | Responsibility |

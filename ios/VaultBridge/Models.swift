@@ -19,12 +19,18 @@ struct VaultCredential: Codable, Identifiable, Hashable {
     var password: String
     var note: String
     var updatedAt: Date
+    // Stable upstream GUID for read-only live connectors. Optional for CSV
+    // entries and backwards compatible with previously saved vaults.
+    var remoteID: String? = nil
 
     var host: String {
         URL(string: origin)?.host ?? origin
     }
 
     var identity: String {
-        [source.rawValue, sourceAccount, origin.lowercased(), username].joined(separator: "\u{1F}")
+        if let remoteID, !remoteID.isEmpty {
+            return [source.rawValue, sourceAccount, remoteID].joined(separator: "\u{1F}")
+        }
+        return [source.rawValue, sourceAccount, origin.lowercased(), username].joined(separator: "\u{1F}")
     }
 }

@@ -28,6 +28,10 @@ def validate(ipa: Path, build: str) -> None:
             raise ValueError("Unexpected app bundle identifier")
         if str(info.get("CFBundleVersion")) != build:
             raise ValueError("Bundled build number does not match FlareStore feed build")
+        # A missing UILaunchScreen makes sideloaded iPhone apps fall back to
+        # legacy compatibility scaling, visibly clipping or letterboxing UI.
+        if "UILaunchScreen" not in info:
+            raise ValueError("Missing UILaunchScreen: iPhone UI may launch in legacy scaled mode")
         extension_info = plistlib.loads(archive.read(required[-1]))
         if extension_info.get("CFBundleIdentifier") != "com.soum91.vaultbridge.autofill":
             raise ValueError("AutoFill extension has an unexpected bundle identifier")
