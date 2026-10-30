@@ -30,6 +30,18 @@ Passwords must not be carried through ordinary clipboard synchronization. The va
 - iOS: macOS with Xcode 16+ and XcodeGen (`cd ios && xcodegen generate`). Set your signing team and provision the Keychain sharing entitlement for both app and AutoFill target. Review the bundle IDs before distributing. The source hasn't been compiled here because the host lacks Xcode.
 - Windows: Windows with .NET 8 SDK (`dotnet build windows/VaultBridge.Windows/VaultBridge.Windows.csproj -c Release`). The source hasn't been compiled here because the host lacks .NET.
 
+## FlareStore feed and automatic releases
+
+Once the first iOS release workflow completes successfully, import either of these URLs into FlareStore:
+
+`https://raw.githubusercontent.com/soum91/vaultbridge/main/repo.json`
+
+`https://raw.githubusercontent.com/soum91/vaultbridge/main/source.json`
+
+The GitHub Actions iOS workflow creates a real GitHub Release containing `VaultBridge.ipa`, then updates both JSON feeds with the direct download URL, file size, dated changelog, and monotonically increasing `0.1.0.BUILD` version. These are **unsigned development builds**. The IPA must be signed before installing and AutoFill/Keychain entitlement sharing still needs on-device verification.
+
+The feed updater refuses to publish a GitHub Actions artifact URL as if it were a direct IPA. It also preserves old version entries for compatibility and rollback. The iOS workflow ignores feed-only bot commits to avoid endless release loops.
+
 ## Security contract
 
 - Local storage uses iOS Keychain (`WhenUnlockedThisDeviceOnly`) or Windows DPAPI (`CurrentUser`). No server-side password store is present.

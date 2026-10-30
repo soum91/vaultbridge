@@ -18,6 +18,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.soum91.vaultbridge
         INFOPLIST_KEY_CFBundleDisplayName: VaultBridge
         INFOPLIST_KEY_NSFaceIDUsageDescription: Authenticate to reveal or autofill stored credentials.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: VaultBridge/VaultBridge.entitlements
     dependencies:

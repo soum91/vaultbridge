@@ -1,30 +1,95 @@
-name: iOS unsigned build
+name: VaultBridge iOS build and FlareStore release
+
 on:
-  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'ios/**'
+      - 'assets/**'
+      - 'scripts/update_repo.py'
+      - 'scripts/validate_ipa.py'
       - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vaultbridge-ios-release
+  cancel-in-progress: false
+
 jobs:
   ios:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set version
+        id: version
+        shell: bash
+        run: |
+          BUILD="${{ github.run_number }}"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version=0.1.0.$BUILD" >> "$GITHUB_OUTPUT"
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
         working-directory: ios
         run: xcodegen generate
-      - name: Build iPhone app and extension without signing
+      - name: Build iPhone app and AutoFill extension unsigned
         working-directory: ios
-        run: xcodebuild -project VaultBridge.xcodeproj -scheme VaultBridge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO -derivedDataPath DerivedData build
-      - name: Package unsigned IPA
+        env:
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+        run: |
+          xcodebuild -project VaultBridge.xcodeproj -scheme VaultBridge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath DerivedData MARKETING_VERSION=0.1.0 CURRENT_PROJECT_VERSION="$BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO build
+      - name: Package and verify IPA
         working-directory: ios
+        env:
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
         run: |
           mkdir -p Payload
           cp -R DerivedData/Build/Products/Release-iphoneos/VaultBridge.app Payload/
-          zip -qry VaultBridge-unsigned.ipa Payload
+          zip -qry VaultBridge.ipa Payload
+          python3 ../scripts/validate_ipa.py VaultBridge.ipa --build "$BUILD_NUMBER"
       - uses: actions/upload-artifact@v4
         with:
-          name: VaultBridge-iOS-unsigned
-          path: ios/VaultBridge-unsigned.ipa
+          name: VaultBridge-iOS-unsigned-${{ steps.version.outputs.version }}
+          path: ios/VaultBridge.ipa
+      - name: Publish release and update FlareStore JSON
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="vaultbridge-v$VERSION"
+          PREV="$(git tag --sort=-v:refname -l 'vaultbridge-v*' | head -1)"
+          if [ -n "$PREV" ]; then
+            git log "$PREV"..HEAD --pretty='* %s' --no-merges > "$RUNNER_TEMP/vaultbridge-notes.txt"
+          else
+            git log -15 --pretty='* %s' --no-merges > "$RUNNER_TEMP/vaultbridge-notes.txt"
+          fi
+          if [ ! -s "$RUNNER_TEMP/vaultbridge-notes.txt" ]; then
+            printf 'Maintenance build %s\n' "$BUILD_NUMBER" > "$RUNNER_TEMP/vaultbridge-notes.txt"
+          fi
+          gh release create "$TAG" "ios/VaultBridge.ipa#VaultBridge.ipa" \
+            --title "VaultBridge $VERSION (unsigned development build)" \
+            --notes-file "$RUNNER_TEMP/vaultbridge-notes.txt" --prerelease
+          python3 scripts/update_repo.py \
+            --version "$VERSION" \
+            --build "$BUILD_NUMBER" \
+            --url "https://github.com/${{ github.repository }}/releases/download/$TAG/VaultBridge.ipa" \
+            --artifact ios/VaultBridge.ipa \
+            --notes "$RUNNER_TEMP/vaultbridge-notes.txt"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add repo.json source.json
+          git commit -m "catalog: publish VaultBridge $VERSION"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git -c rebase.autoStash=true rebase origin/main
+            if git push origin HEAD:main; then break; fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+          done
