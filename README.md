@@ -24,11 +24,11 @@ connector. Apple iCloud Keychain and Google Password Manager do not expose a
 general third-party read-all-passwords API; never fake live integrations or
 request their account passwords directly.
 
-This is a **development preview**, not a production-ready password manager. It includes a SwiftUI iPhone app, a Windows WPF app, OS-protected local storage, manual entries and native CSV import. The iOS app now includes an **opt-in read-only Reynard Keychain bridge** that can fetch credentials already synchronized by Reynard under a shared signing team. This is not an independent Mozilla sign-in flow, and the shared Keychain entitlement is unverified on sideloaded devices. It does **not** include an independent Mozilla sign-in, Windows/iPhone vault transport, Windows browser extension or a production-signed release. Do not import irreplaceable passwords until the apps are reviewed and device-tested.
+This is a **development preview**, not a production-ready password manager. It includes a SwiftUI iPhone app, a Windows WPF app, OS-protected local storage, manual entries and native CSV import. The iOS app now has an **experimental stand-alone Mozilla sign-in and read-only Firefox Sync downloader**, porting the crypto and Sync transport from our Reynard fork. It does **not** depend on Reynard's Keychain or its signing certificate. Account login and decryption have **not yet been verified on a real Mozilla account**. Windows/iPhone vault transport, Windows browser extension and a production-signed release are still absent. Use a disposable test account until security review and device testing succeed.
 
 | Source | Planned mechanism | Current status |
 | --- | --- | --- |
-| Firefox Sync | Read-only local bridge to Reynard's already-decrypted Keychain store; own Mozilla account client is separate work | iOS implementation added, pending signing/device validation; not available on Windows |
+| Firefox Sync | Stand-alone Mozilla OAuth, scoped-key decryption, Hawk Sync 1.5 download, password-only read into local Keychain | Experimental iOS implementation added, pending end-to-end account testing; not available on Windows |
 | Apple Passwords/iCloud | User-authorized CSV import | Implemented in source |
 | Google Password Manager / Chrome | User-authorized CSV import | Implemented in source |
 | Local | Add an entry in the app | Implemented in source |
@@ -41,7 +41,7 @@ Passwords must not be carried through ordinary clipboard synchronization. The va
 
 ## Structure
 
-- `ios/`: SwiftUI iPhone application with Keychain-backed local vault, native Files picker, Face ID/passcode reveal and optional Reynard Sync Keychain reader.
+- `ios/`: SwiftUI iPhone application with Keychain-backed local vault, native Files picker, Face ID/passcode reveal and independent Firefox Sync source.
 - `windows/`: .NET WPF application with Windows DPAPI-protected vault, CSV file picker and clipboard-copy action.
 - `docs/`: security requirements and Firefox porting checklist.
 
@@ -72,8 +72,8 @@ The feed updater refuses to publish a GitHub Actions artifact URL as if it were 
 
 ## Next milestones
 
-1. Device-test the shared Keychain entitlement with a disposable Mozilla account and both Reynard/VaultBridge signed by the same Apple team. The integration is opt-in, read-only, refreshes when VaultBridge becomes active, and never deletes saved entries on Keychain access/decode failure.
-2. Extract and adapt the existing Reynard `FxAAccountManager`, `FxACrypto`, `SyncStorageClient` and the password-only portion of `SyncManager`; replace Gecko WebChannel dependencies with a supported account authorization flow and re-test with a disposable Mozilla account.
+1. Device-test direct Mozilla sign-in using a disposable account and validate that Firefox Sync passwords decrypt exactly on iPhone. The temporary WebChannel-in-WebKit handoff borrows the Reynard/Fenix OAuth client ID and is **not a registered production VaultBridge OAuth client**. It may be rejected by Mozilla and must be replaced with a supported, registered account authorization client and system browser flow before handling real secrets.
+2. Run an independent security review of the ported FxA `FxACrypto`, `FxAHTTP`, `FxAConfig`, `SyncStorageClient` and the standalone password-only connector. Keep server updates disabled until correct conflict handling exists.
 3. Implement the equivalent Firefox connector on Windows, using a compatible, maintained Sync library or carefully audited shared core.
 4. Device-test both vaults, their extensions and malformed CSV handling, then run a security review.
 5. Build authenticated, end-to-end encrypted device synchronization and Windows browser autofill.

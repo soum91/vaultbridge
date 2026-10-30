@@ -2,82 +2,6 @@ import LocalAuthentication
 import SwiftUI
 import UniformTypeIdentifiers
 
-private struct LegacyVaultHomeView: View {
-    @StateObject private var vault = VaultModel()
-    @State private var query = ""
-    @State private var source: CredentialSource = .google
-    @State private var sourceAccount = ""
-    @State private var importing = false
-    @State private var adding = false
-    @State private var message: String?
-
-    private var results: [VaultCredential] {
-        vault.entries.filter {
-            query.isEmpty || [$0.title, $0.origin, $0.username, $0.source.rawValue]
-                .contains(where: { $0.localizedCaseInsensitiveContains(query) })
-        }.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Add credentials") {
-                    Picker("Import from", selection: $source) {
-                        Text("Apple Passwords").tag(CredentialSource.apple)
-                        Text("Google / Chrome").tag(CredentialSource.google)
-                        Text("Firefox CSV (temporary)").tag(CredentialSource.firefox)
-                    }
-                    TextField("Account label (optional)", text: $sourceAccount)
-                        .textInputAutocapitalization(.never)
-                    Button("Import CSV using Files") { importing = true }
-                    Button("Add password manually") { adding = true }
-                }
-                Section("Saved credentials (\(results.count))") {
-                    if results.isEmpty { Text("No credentials saved yet").foregroundStyle(.secondary) }
-                    ForEach(results) { entry in
-                        NavigationLink {
-                            VaultCredentialView(entry: entry) { vault.remove(entry) }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry.title).font(.headline)
-                                Text(entry.username).font(.subheadline)
-                                Text(entry.source.rawValue + (entry.sourceAccount.isEmpty ? "" : " · " + entry.sourceAccount))
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                Section("Connections") {
-                    Label("Firefox live Sync: integration pending", systemImage: "arrow.triangle.2.circlepath")
-                    Text("Apple and Google use manual CSV imports, not automatic account sync.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .searchable(text: $query)
-            .navigationTitle("VaultBridge")
-            .fileImporter(isPresented: $importing, allowedContentTypes: [.commaSeparatedText, .plainText, .text]) { result in
-                switch result {
-                case .failure(let error): message = error.localizedDescription
-                case .success(let url):
-                    let granted = url.startAccessingSecurityScopedResource()
-                    defer { if granted { url.stopAccessingSecurityScopedResource() } }
-                    do {
-                        let rows = try CredentialCSVImporter.parse(Data(contentsOf: url), source: source, account: sourceAccount)
-                        let saved = vault.merge(rows)
-                        message = "Imported \(saved) credentials from \(source.rawValue). Delete the plaintext CSV after checking the import."
-                    } catch { message = error.localizedDescription }
-                }
-            }
-            .sheet(isPresented: $adding) { AddCredentialView { vault.merge([$0]); adding = false } }
-            .alert("VaultBridge", isPresented: Binding(get: { message != nil || vault.lastError != nil },
-                                                      set: { if !$0 { message = nil; vault.lastError = nil } })) {
-                Button("OK", role: .cancel) { message = nil; vault.lastError = nil }
-            } message: { Text(message ?? vault.lastError ?? "") }
-        }
-    }
-}
-
-struct AddCredentialView: View {
     let onSave: (VaultCredential) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
@@ -160,7 +84,7 @@ struct VaultCredentialView: View {
 // being rendered at legacy, scaled dimensions on some sideloaded iPhone builds.
 struct VaultHomeView: View {
     @StateObject private var vault = VaultModel()
-    @AppStorage("reynardBridgeEnabled") private var reynardBridgeEnabled = false
+    @StateObject private var firefox = FirefoxSyncService()
     @Environment(\.scenePhase) private var currentScenePhase
     @State private var search = ""
     @State private var chosenProvider: CredentialSource?
@@ -169,6 +93,7 @@ struct VaultHomeView: View {
     @State private var showingImportSetup = false
     @State private var showingFiles = false
     @State private var showingAdd = false
+    @State private var firefoxLogin: FirefoxLoginRequest?
     @State private var alertText: String?
 
     private var filtered: [VaultCredential] {
@@ -202,9 +127,9 @@ struct VaultHomeView: View {
                         heading("Accounts", "Manage your password sources")
                         VStack(spacing: 0) {
                             sourceRow(.firefox, symbol: "globe", color: .orange,
-                                      status: reynardBridgeEnabled
-                                        ? "Connected to Reynard · refreshes on open"
-                                        : "Connect to Reynard Firefox Sync")
+                                      status: firefox.isRefreshing
+                                        ? "Syncing passwords…"
+                                        : firefox.accountEmail ?? "Sign in with Mozilla account")
                             Divider().padding(.leading, 58)
                             sourceRow(.apple, symbol: "apple.logo", color: .primary,
                                       status: "iCloud vault access restricted")
@@ -302,7 +227,7 @@ struct VaultHomeView: View {
                                     in: RoundedRectangle(cornerRadius: 16))
                     }
 
-                    Label("Preview build. Automatic account sync and Windows transfer are not active yet. Keep your original password manager enabled.",
+                    Label("Development preview. Firefox Sync is read-only and requires account sign-in. Windows transfer is not active. Keep your original password manager enabled.",
                           systemImage: "exclamationmark.shield")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -316,15 +241,32 @@ struct VaultHomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { refreshReynardIfConnected() }
+            .onAppear { refreshFirefoxIfConnected() }
             .onChange(of: currentScenePhase) { _, phase in
-                if phase == .active { refreshReynardIfConnected() }
+                if phase == .active { refreshFirefoxIfConnected() }
             }
             .sheet(item: $chosenProvider) { source in
                 providerDetails(source)
                     .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showingImportSetup) { importOptions }
+            .sheet(item: $firefoxLogin) { request in
+                NavigationStack {
+                    FirefoxAccountWebView(url: request.url) { envelope, reply in
+                        handleFirefoxMessage(envelope, reply: reply)
+                    }
+                    .navigationTitle("Mozilla Account")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") {
+                                firefox.cancelSignIn()
+                                firefoxLogin = nil
+                            }
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $showingAdd) {
                 AddCredentialView {
                     vault.merge([$0])
@@ -367,30 +309,81 @@ struct VaultHomeView: View {
         }
     }
 
-    private func refreshReynardIfConnected() {
-        guard reynardBridgeEnabled else { return }
-        do {
-            _ = try vault.refreshFromReynard()
-        } catch {
-            // Do not replace saved passwords or repeatedly present an alert
-            // if a signed-in user temporarily cannot access Reynard's Keychain.
+    private func refreshFirefoxIfConnected() {
+        guard firefox.isSignedIn, !firefox.isRefreshing else { return }
+        Task {
+            // Network outages should not erase a valid previously synced vault.
+            _ = try? await firefox.refresh(into: vault)
         }
     }
 
-    private func connectReynard() {
-        do {
-            let count = try vault.refreshFromReynard()
-            reynardBridgeEnabled = true
-            chosenProvider = nil
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                alertText = "Fetched \(count) Firefox Sync passwords from Reynard. VaultBridge checks again when you open it."
+    private func startFirefoxLogin() {
+        Task {
+            do {
+                let url = try await firefox.beginSignIn()
+                chosenProvider = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    firefoxLogin = FirefoxLoginRequest(url: url)
+                }
+            } catch {
+                showFirefoxResult(error.localizedDescription)
             }
-        } catch {
-            let detail = error.localizedDescription
-            chosenProvider = nil
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                alertText = detail
+        }
+    }
+
+    private func syncFirefoxNow() {
+        Task {
+            do {
+                let count = try await firefox.refresh(into: vault)
+                showFirefoxResult("Downloaded \(count) Firefox passwords from your Mozilla account.")
+            } catch {
+                showFirefoxResult(error.localizedDescription)
             }
+        }
+    }
+
+    private func showFirefoxResult(_ text: String) {
+        chosenProvider = nil
+        firefoxLogin = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            alertText = text
+        }
+    }
+
+    private func handleFirefoxMessage(
+        _ envelope: [String: Any],
+        reply: @escaping ([String: Any]) -> Void
+    ) {
+        guard let payload = envelope["message"] as? [String: Any],
+              let command = payload["command"] as? String else { return }
+        let id = payload["messageId"] ?? ""
+        let data = payload["data"] as? [String: Any] ?? [:]
+        func respond(_ value: [String: Any]) {
+            reply([
+                "id": FxAConfig.webChannelID,
+                "message": ["command": command, "messageId": id, "data": value]
+            ])
+        }
+        switch command {
+        case "fxaccounts:fxa_status":
+            respond(firefox.webChannelStatus())
+        case "fxaccounts:can_link_account":
+            respond(["ok": firefox.canLink(
+                email: data["email"] as? String, uid: data["uid"] as? String)])
+        case "fxaccounts:oauth_login":
+            guard let code = data["code"] as? String,
+                  let state = data["state"] as? String else { return }
+            Task {
+                do {
+                    try await firefox.finishSignIn(code: code, state: state)
+                    let count = try await firefox.refresh(into: vault)
+                    showFirefoxResult("Mozilla account connected. Downloaded \(count) Firefox passwords.")
+                } catch {
+                    showFirefoxResult(error.localizedDescription)
+                }
+            }
+        default:
+            break
         }
     }
 
@@ -430,7 +423,9 @@ struct VaultHomeView: View {
                 Text(source.rawValue).font(.title2.bold())
                 Group {
                     if source == .firefox {
-                        Text("Use the Mozilla account already connected in Reynard. VaultBridge can read Reynard's locally synced password store when both apps are signed by the same Apple team with shared Keychain access. It refreshes when VaultBridge opens; Reynard must sync first.")
+                        Text(firefox.isSignedIn
+                             ? "Signed in as \(firefox.accountEmail ?? "Mozilla account"). Download Firefox passwords directly using your Mozilla Sync account."
+                             : "Sign in to Mozilla once to download encrypted Firefox Sync passwords directly. You can use a different signing certificate from Reynard or Firefox. This is an experimental connection; try a test account first.")
                     } else if source == .apple {
                         Text("Apple does not expose an API that lets VaultBridge sign into iCloud Keychain and read your passwords. You can import an export from Apple Passwords.")
                     } else {
@@ -440,10 +435,21 @@ struct VaultHomeView: View {
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
                 if source == .firefox {
-                    Button(reynardBridgeEnabled ? "Refresh from Reynard" : "Connect to Reynard") {
-                        connectReynard()
+                    if firefox.isSignedIn {
+                        Button("Sync Firefox passwords now") { syncFirefoxNow() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(firefox.isRefreshing)
+                        Button("Sign out of Mozilla") {
+                            Task {
+                                await firefox.signOut()
+                                chosenProvider = nil
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button("Sign in with Mozilla") { startFirefoxLogin() }
+                            .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
                 } else {
                     Button("Import existing passwords") {
                         selectedImportSource = source

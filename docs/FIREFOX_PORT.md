@@ -5,21 +5,27 @@ Inspected branch head: `55eecc5b63114b0072bf14bd4c55acec01e3a40a` (October 26, 2
 
 This is an integration specification, **not** a claim that Mozilla sign-in or password refresh already works in VaultBridge.
 
-## Current iOS bridge experiment
+## Current standalone iOS experiment
 
-The iOS preview now has a read-only, opt-in connector for the **existing local
-Reynard Sync Keychain record**. It uses exactly the service
-`com.minh-ton.Reynard.SyncedLogins`, account `firefox`, and Reynard's own
-shared Keychain access group. The apps **must be signed under the same Apple
-team**, with entitlements accepted by iOS. The bridge decodes Reynard's current
-`SyncedLogin` schema, imports records by remote GUID, and replaces previously
-synced records only after a complete successful Keychain read and parse.
+The shared-Reynard-Keychain bridge was removed because the user's Reynard and
+VaultBridge are signed with **different** Apple developer teams. Separate apps
+cannot enumerate one another's Keychain secrets or Firefox account tokens.
+The App Store Firefox app cannot export its signed-in state to us either.
 
-This relies on Reynard to log into Firefox, fetch and decrypt records; it does
-not authenticate with Mozilla itself. VaultBridge checks for refreshed records
-when its scene becomes active. It is **not background cloud sync** and not yet
-verified on the user's signed iPhone. If the signing team is different or the
-entitlement was stripped, the app explains that it cannot access the store.
+The new iOS connector vendors four small modules from the
+`firefox-account-sync` fork: `FxACrypto.swift`, `FxAHTTP.swift`,
+`FxAConfig.swift`, and `SyncStorageClient.swift`. Its own account coordinator
+builds Mozilla OAuth PKCE + scoped key requests, processes a verified-origin
+WebChannel callback, exchanges and stores its own refresh token in VaultBridge's
+Keychain, and uses Hawk authenticated Sync 1.5 read-only requests to fetch and
+decrypt password records. It preserves existing saved passwords on any
+authentication, Keychain, transport or record-integrity failure.
+
+**Not yet production-ready:** WebKit's WebChannel emulation has not been tested
+against a real Firefox Account. The OAuth client ID originates with a Mozilla
+browser client, not a registration issued to VaultBridge. A registered client,
+proper system authorization browser handoff, test accounts, and end-to-end
+cryptographic regression tests are required before using personal passwords.
 
 ## Confirmed existing components
 
