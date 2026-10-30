@@ -50,10 +50,10 @@ import Foundation
                 user: entry.username,
                 recordIdentifier: entry.id.uuidString)
         }
-        ASCredentialIdentityStore.shared.getCredentialIdentityStoreState { state in
+        ASCredentialIdentityStore.shared.getState { state in
             guard state.isEnabled else { return }
-            ASCredentialIdentityStore.shared.removeAllCredentialIdentities { _ in
-                ASCredentialIdentityStore.shared.saveCredentialIdentities(identities, completion: { _ in })
+            ASCredentialIdentityStore.shared.removeAllCredentialIdentities { _, _ in
+                ASCredentialIdentityStore.shared.saveCredentialIdentities(identities, completion: { _, _ in })
             }
         }
     }
