@@ -110,6 +110,7 @@ private enum ReynardPasswordBridge {
     private static let service = "com.minh-ton.Reynard.SyncedLogins"
     private static let account = "firefox"
     private static let groupSuffix = "com.minh-ton.Reynard"
+    private static let ownGroupSuffix = "com.soum91.vaultbridge.shared"
 
     private struct SyncedLogin: Decodable {
         let id: String
@@ -120,13 +121,7 @@ private enum ReynardPasswordBridge {
     }
 
     static func read() throws -> [VaultCredential] {
-        guard let task = SecTaskCreateFromSelf(nil),
-              let raw = SecTaskCopyValueForEntitlement(
-                task, "keychain-access-groups" as CFString, nil),
-              let groups = raw as? [String],
-              let group = groups.first(where: { $0.hasSuffix(groupSuffix) }) else {
-            throw ReynardPasswordBridgeError.missingEntitlement
-        }
+        let group = try reynardAccessGroup()
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -169,5 +164,32 @@ private enum ReynardPasswordBridge {
                 remoteID: record.id
             )
         }
+    }
+
+    // SecTaskCopyValueForEntitlement is not part of the public iOS app SDK.
+    // Discover our signing-team prefix from a temporary Keychain item's
+    // returned attributes instead. No account credentials are involved.
+    private static func reynardAccessGroup() throws -> String {
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.soum91.vaultbridge.keychain-prefix-check",
+            kSecAttrAccount as String: UUID().uuidString
+        ]
+        var add = probe
+        add[kSecValueData as String] = Data([0x01])
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        add[kSecReturnAttributes as String] = true
+
+        var result: CFTypeRef?
+        let status = SecItemAdd(add as CFDictionary, &result)
+        defer { SecItemDelete(probe as CFDictionary) }
+        guard status == errSecSuccess,
+              let attributes = result as? [String: Any],
+              let ownGroup = attributes[kSecAttrAccessGroup as String] as? String,
+              ownGroup.hasSuffix(ownGroupSuffix) else {
+            throw ReynardPasswordBridgeError.missingEntitlement
+        }
+        let prefix = ownGroup.dropLast(ownGroupSuffix.count)
+        return String(prefix) + groupSuffix
     }
 }
