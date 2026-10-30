@@ -1,0 +1,31 @@
+{
+  "name": "VaultBridge",
+  "identifier": "com.soum91.vaultbridge.source",
+  "subtitle": "Password vault for iPhone and Windows",
+  "description": "Unsigned development builds. Manual Apple and Google password imports; live Firefox Sync and cross-device vault sync are not ready. Do not store real passwords until security validation is complete.",
+  "sourceURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/source.json",
+  "iconURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/ios/VaultBridge/Assets.xcassets/AppIcon.appiconset/Icon-1024.png",
+  "apps": [
+    {
+      "name": "VaultBridge",
+      "bundleIdentifier": "com.soum91.vaultbridge",
+      "developerName": "soum91",
+      "subtitle": "Multiple password sources in one local vault",
+      "localizedDescription": "Development preview. Import Apple Passwords, Google/Chrome or Firefox CSV, or add credentials manually. Passwords are locally protected. Live Firefox Sync, Windows browser autofill and end-to-end device sync are still pending.",
+      "category": "utilities",
+      "iconURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/ios/VaultBridge/Assets.xcassets/AppIcon.appiconset/Icon-1024.png",
+      "versions": [
+        {
+          "version": "0.1.0.3",
+          "buildVersion": "3",
+          "date": "2026-10-30",
+          "localizedDescription": "* ci: publish versioned unsigned IPA releases and FlareStore JSON feed\n* Fix iOS AutoFill identity-store API compilation\n* Fix missing System.IO imports in Windows build\n* Add VaultBridge iOS and Windows source milestone with safe password imports\n* Initial commit",
+          "changelog": "* ci: publish versioned unsigned IPA releases and FlareStore JSON feed\n* Fix iOS AutoFill identity-store API compilation\n* Fix missing System.IO imports in Windows build\n* Add VaultBridge iOS and Windows source milestone with safe password imports\n* Initial commit",
+          "downloadURL": "https://github.com/soum91/vaultbridge/releases/download/vaultbridge-v0.1.0.3/VaultBridge.ipa",
+          "size": 298938,
+          "minOSVersion": "17.0"
+        }
+      ]
+    }
+  ]
+}
