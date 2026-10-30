@@ -1,4 +1,5 @@
 using Microsoft.VisualBasic.FileIO;
+using System.IO;
 
 namespace VaultBridge.Windows;
 
