@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.DS_Store
+ios/*.xcodeproj/
+**/DerivedData/
+*.ipa
+*.p12
+*.mobileprovision
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+*.log

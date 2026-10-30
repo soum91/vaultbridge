@@ -1,0 +1,30 @@
+name: iOS unsigned build
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build iPhone app and extension without signing
+        working-directory: ios
+        run: xcodebuild -project VaultBridge.xcodeproj -scheme VaultBridge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO -derivedDataPath DerivedData build
+      - name: Package unsigned IPA
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -R DerivedData/Build/Products/Release-iphoneos/VaultBridge.app Payload/
+          zip -qry VaultBridge-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VaultBridge-iOS-unsigned
+          path: ios/VaultBridge-unsigned.ipa

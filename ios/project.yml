@@ -1,0 +1,38 @@
+name: VaultBridge
+options:
+  bundleIdPrefix: com.soum91.vaultbridge
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: '17.0'
+    SWIFT_VERSION: '5.10'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    CODE_SIGN_STYLE: Automatic
+targets:
+  VaultBridge:
+    type: application
+    platform: iOS
+    sources:
+      - path: VaultBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.soum91.vaultbridge
+        INFOPLIST_KEY_CFBundleDisplayName: VaultBridge
+        INFOPLIST_KEY_NSFaceIDUsageDescription: Authenticate to reveal or autofill stored credentials.
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: VaultBridge/VaultBridge.entitlements
+    dependencies:
+      - target: VaultBridgeAutoFill
+        embed: true
+  VaultBridgeAutoFill:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: AutoFill
+      - path: VaultBridge/Models.swift
+      - path: VaultBridge/KeychainVault.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.soum91.vaultbridge.autofill
+        CODE_SIGN_ENTITLEMENTS: AutoFill/AutoFill.entitlements
+        INFOPLIST_FILE: AutoFill/Info.plist
+        GENERATE_INFOPLIST_FILE: NO

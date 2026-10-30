@@ -1,0 +1,34 @@
+<Window x:Class="VaultBridge.Windows.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="VaultBridge" Width="900" Height="640" MinWidth="660" MinHeight="500" Background="#111827" Foreground="#F9FAFB">
+  <Grid Margin="24">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Text="VaultBridge" FontSize="30" FontWeight="SemiBold"/>
+      <TextBlock Text="One local view of your Apple, Google, Firefox and manually saved credentials" Foreground="#9CA3AF" Margin="0,4,0,0"/>
+    </StackPanel>
+    <StackPanel Grid.Row="1" Margin="0,0,0,16">
+      <WrapPanel Margin="0,0,0,10">
+        <ComboBox x:Name="SourceBox" Width="190" Height="32" SelectedIndex="0" Margin="0,0,8,0" Foreground="Black">
+          <ComboBoxItem Content="Google Password Manager"/><ComboBoxItem Content="Apple Passwords"/><ComboBoxItem Content="Firefox CSV"/>
+        </ComboBox>
+        <TextBox x:Name="AccountBox" Width="170" Height="32" VerticalContentAlignment="Center" Text="" ToolTip="Optional account label" Margin="0,0,8,0" Foreground="Black"/>
+        <Button Content="Import CSV…" Click="Import_Click" Padding="12,7" Margin="0,0,8,0"/>
+        <Button Content="Add manually" Click="Add_Click" Padding="12,7"/>
+      </WrapPanel>
+      <TextBox x:Name="SearchBox" Height="34" Foreground="Black" VerticalContentAlignment="Center" TextChanged="Search_Changed" ToolTip="Search credentials by site, username or source"/>
+    </StackPanel>
+    <ListView x:Name="CredentialList" Grid.Row="2" Foreground="Black" SelectionMode="Single">
+      <ListView.View><GridView>
+        <GridViewColumn Header="Site" DisplayMemberBinding="{Binding Title}" Width="230"/>
+        <GridViewColumn Header="Username" DisplayMemberBinding="{Binding Username}" Width="200"/>
+        <GridViewColumn Header="Source" DisplayMemberBinding="{Binding SourceLabel}" Width="280"/>
+      </GridView></ListView.View>
+    </ListView>
+    <DockPanel Grid.Row="3" Margin="0,16,0,0">
+      <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+        <Button Content="Copy password" Padding="12,8" Click="Copy_Click" Margin="0,0,8,0"/>
+        <Button Content="Delete local entry" Padding="12,8" Click="Delete_Click"/>
+      </StackPanel>
+      <TextBlock x:Name="StatusLabel" Text="Firefox live Sync and cross-device sync are not connected yet." VerticalAlignment="Center" Foreground="#FBBF24" TextWrapping="Wrap"/>
+    </DockPanel>
+  </Grid>
+</Window>
