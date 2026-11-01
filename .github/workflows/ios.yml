@@ -41,15 +41,24 @@ jobs:
         working-directory: ios
         env:
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          xcodebuild -project VaultBridge.xcodeproj -scheme VaultBridge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath DerivedData MARKETING_VERSION=0.1.0 CURRENT_PROJECT_VERSION="$BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO build
+          xcodebuild -project VaultBridge.xcodeproj -scheme VaultBridge -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath DerivedData MARKETING_VERSION="$RELEASE_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO build
       - name: Package and verify IPA
         working-directory: ios
         env:
           BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p Payload
           cp -R DerivedData/Build/Products/Release-iphoneos/VaultBridge.app Payload/
+          # Match the catalog version in both bundles so updates stop recurring.
+          for PLIST in Payload/VaultBridge.app/Info.plist Payload/VaultBridge.app/PlugIns/VaultBridgeAutoFill.appex/Info.plist; do
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $RELEASE_VERSION" "$PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$PLIST"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$PLIST")" = "$RELEASE_VERSION"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")" = "$BUILD_NUMBER"
+          done
           zip -qry VaultBridge.ipa Payload
           python3 ../scripts/validate_ipa.py VaultBridge.ipa --build "$BUILD_NUMBER"
       - uses: actions/upload-artifact@v4
