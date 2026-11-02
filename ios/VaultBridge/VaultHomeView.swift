@@ -1,3 +1,4 @@
+import AuthenticationServices
 import LocalAuthentication
 import SwiftUI
 import UniformTypeIdentifiers
@@ -94,6 +95,7 @@ struct VaultHomeView: View {
     @State private var showingImportSetup = false
     @State private var showingFiles = false
     @State private var showingAdd = false
+    @State private var importingApplePasswords = false
     @State private var firefoxLogin: FirefoxLoginRequest?
     @State private var alertText: String?
 
@@ -133,7 +135,7 @@ struct VaultHomeView: View {
                                         : firefox.accountEmail ?? "Sign in with Mozilla account")
                             Divider().padding(.leading, 58)
                             sourceRow(.apple, symbol: "apple.logo", color: .primary,
-                                      status: "iCloud vault access restricted")
+                                      status: "Transfer securely from Apple Passwords")
                             Divider().padding(.leading, 58)
                             sourceRow(.google, symbol: "g.circle.fill", color: .blue,
                                       status: "Google vault access restricted")
@@ -232,6 +234,10 @@ struct VaultHomeView: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         heading("Tools", "Existing exports and backups")
+                        if importingApplePasswords {
+                            ProgressView("Receiving passwords from Apple…")
+                                .padding(.vertical, 10)
+                        }
                         Button { showingImportSetup = true } label: {
                             Label("Import a password file", systemImage: "square.and.arrow.down")
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -256,6 +262,11 @@ struct VaultHomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
+            .onContinueUserActivity(credentialExchangeActivity) { activity in
+                if #available(iOS 26.0, *) {
+                    receiveApplePasswords(activity)
+                }
+            }
             .sheet(item: $chosenProvider) { source in
                 providerDetails(source)
                     .presentationDetents([.medium, .large])
@@ -318,6 +329,79 @@ struct VaultHomeView: View {
             Text(title).font(.headline)
             Text(subtitle).font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    private var credentialExchangeActivity: String {
+        if #available(iOS 26.0, *) { return ASCredentialExchangeActivity }
+        return "ASCredentialExchangeActivityType"
+    }
+
+    @available(iOS 26.0, *)
+    private func receiveApplePasswords(_ activity: NSUserActivity) {
+        guard !importingApplePasswords else { return }
+        guard let token = activity.userInfo?[ASCredentialImportToken] as? UUID else {
+            alertText = "Apple Passwords did not provide a valid transfer token. Start the transfer again in Passwords."
+            return
+        }
+        importingApplePasswords = true
+        Task {
+            defer { importingApplePasswords = false }
+            do {
+                // Apple's exchange channel never writes a plaintext CSV file.
+                let export = try await ASCredentialImportManager().importCredentials(token: token)
+                let (rows, skipped) = Self.applePasswordRows(from: export)
+                guard !rows.isEmpty else {
+                    alertText = "No website passwords to import. \(skipped) unsupported or incomplete items were skipped. VaultBridge does not yet support transferring passkeys or verification codes."
+                    return
+                }
+                while vault.isLoading {
+                    try await Task.sleep(nanoseconds: 75_000_000)
+                }
+                let count = try await vault.mergeImported(rows)
+                alertText = "Imported \(count) passwords securely from Apple Passwords. \(skipped) unsupported or incomplete items skipped. Your originals remain in Apple Passwords."
+            } catch {
+                alertText = "Apple Passwords transfer failed: \(error.localizedDescription). Your existing VaultBridge passwords were kept."
+            }
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private static func applePasswordRows(from export: ASExportedCredentialData)
+        -> (rows: [VaultCredential], skipped: Int) {
+        var rows: [VaultCredential] = []
+        var skipped = 0
+        for account in export.accounts {
+            let accountLabel = account.email.isEmpty ? "Apple Passwords" : account.email
+            for item in account.items {
+                guard let url = item.scope?.urls.first(where: {
+                    ["https", "http"].contains($0.scheme?.lowercased() ?? "") && $0.host != nil
+                }) else {
+                    skipped += item.credentials.count
+                    continue
+                }
+                for (index, credential) in item.credentials.enumerated() {
+                    guard case let .basicAuthentication(basic) = credential,
+                          let password = basic.password?.value, !password.isEmpty else {
+                        skipped += 1
+                        continue
+                    }
+                    let username = basic.userName?.value ?? ""
+                    let sourceID = item.id.isEmpty
+                        ? "\(url.absoluteString):\(username)"
+                        : item.id.base64EncodedString()
+                    rows.append(VaultCredential(
+                        id: UUID(), source: .apple, sourceAccount: accountLabel,
+                        origin: url.absoluteString,
+                        title: item.title.isEmpty ? (url.host ?? url.absoluteString) : item.title,
+                        username: username, password: password,
+                        note: item.subtitle ?? "",
+                        updatedAt: item.lastModified ?? item.created ?? Date(),
+                        remoteID: "cxf:\(sourceID):\(index)"
+                    ))
+                }
+            }
+        }
+        return (rows, skipped)
     }
 
     private func startFirefoxLogin() {
@@ -432,7 +516,7 @@ struct VaultHomeView: View {
                              ? "Signed in as \(firefox.accountEmail ?? "Mozilla account"). Download Firefox passwords directly using your Mozilla Sync account."
                              : "Sign in to Mozilla once to download encrypted Firefox Sync passwords directly. You can use a different signing certificate from Reynard or Firefox. This is an experimental connection; try a test account first.")
                     } else if source == .apple {
-                        Text("Apple does not expose an API that lets VaultBridge sign into iCloud Keychain and read your passwords. You can import an export from Apple Passwords.")
+                        Text("On iOS 26 or later, open Apple Passwords, choose its transfer-to-another-app option, and select VaultBridge. Apple securely sends your selected passwords directly to VaultBridge without an unencrypted CSV. Passkeys and verification codes are not yet supported; CSV remains a fallback for older iOS versions.")
                     } else {
                         Text("Google sign-in does not give a third-party app access to stored Google Password Manager passwords. You can import a Chrome or Google Password Manager export.")
                     }

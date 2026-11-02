@@ -13,4 +13,11 @@
 <key>NSExtension</key><dict>
   <key>NSExtensionPointIdentifier</key><string>com.apple.authentication-services-credential-provider-ui</string>
   <key>NSExtensionPrincipalClass</key><string>$(PRODUCT_MODULE_NAME).AutoFillViewController</string>
+  <key>NSExtensionAttributes</key><dict>
+    <key>ASCredentialProviderExtensionCapabilities</key><dict>
+      <key>ProvidesPasswords</key><true/>
+      <key>SupportsCredentialExchange</key><true/>
+      <key>SupportedCredentialExchangeVersions</key><array><string>1.0</string></array>
+    </dict>
+  </dict>
 </dict></dict></plist>

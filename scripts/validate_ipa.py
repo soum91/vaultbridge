@@ -32,9 +32,18 @@ def validate(ipa: Path, build: str) -> None:
         # legacy compatibility scaling, visibly clipping or letterboxing UI.
         if "UILaunchScreen" not in info:
             raise ValueError("Missing UILaunchScreen: iPhone UI may launch in legacy scaled mode")
+        if "ASCredentialExchangeActivityType" not in info.get("NSUserActivityTypes", []):
+            raise ValueError("App is missing the Apple Passwords credential-exchange activity")
         extension_info = plistlib.loads(archive.read(required[-1]))
         if extension_info.get("CFBundleIdentifier") != "com.soum91.vaultbridge.autofill":
             raise ValueError("AutoFill extension has an unexpected bundle identifier")
+        capabilities = (extension_info.get("NSExtension", {})
+                        .get("NSExtensionAttributes", {})
+                        .get("ASCredentialProviderExtensionCapabilities", {}))
+        if capabilities.get("SupportsCredentialExchange") is not True:
+            raise ValueError("AutoFill extension is not advertised as a credential-exchange receiver")
+        if "1.0" not in capabilities.get("SupportedCredentialExchangeVersions", []):
+            raise ValueError("AutoFill extension lacks Credential Exchange Format 1.0 support")
     print(f"Validated unsigned VaultBridge IPA: build {build}")
 
 

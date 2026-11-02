@@ -30,14 +30,19 @@ only an advanced fallback, not the core workflow. An account UI that merely
 opens a login page without securely fetching passwords is **not** a completed
 connector. Apple iCloud Keychain and Google Password Manager do not expose a
 general third-party read-all-passwords API; never fake live integrations or
-request their account passwords directly.
+request their account passwords directly. iOS 26+ provides a separate,
+user-initiated secure credential-exchange path: Apple Passwords can transfer
+passwords to VaultBridge directly when its AutoFill provider is eligible and
+the person explicitly chooses VaultBridge in Apple's destination picker.
+This is one-time transfer, not continuous iCloud sync. Passkeys/TOTP transfer
+are deferred until VaultBridge implements and verifies those record types.
 
 This is a **development preview**, not a production-ready password manager. It includes a SwiftUI iPhone app, a Windows WPF app, OS-protected local storage, manual entries and native CSV import. The iOS app now has an **experimental stand-alone Mozilla sign-in and read-only Firefox Sync downloader**, porting the crypto and Sync transport from our Reynard fork. It does **not** depend on Reynard's Keychain or its signing certificate. Account login and decryption have **not yet been verified on a real Mozilla account**. Windows/iPhone vault transport, Windows browser extension and a production-signed release are still absent. Use a disposable test account until security review and device testing succeed.
 
 | Source | Planned mechanism | Current status |
 | --- | --- | --- |
 | Firefox Sync | Stand-alone Mozilla OAuth, scoped-key decryption, Hawk Sync 1.5 download, password-only read into local Keychain | Experimental iOS implementation added, pending end-to-end account testing; not available on Windows |
-| Apple Passwords/iCloud | User-authorized CSV import | Implemented in source |
+| Apple Passwords/iCloud | Direct iOS 26+ credential exchange from Apple Passwords, plus optional CSV import | Password-only receiver implemented in source; on-device destination discovery/signing verification pending |
 | Google Password Manager / Chrome | User-authorized CSV import | Implemented in source |
 | Local | Add an entry in the app | Implemented in source |
 

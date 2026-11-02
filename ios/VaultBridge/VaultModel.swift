@@ -47,6 +47,34 @@ import Foundation
         }
     }
 
+    /// A credential exchange can deliver thousands of passwords at once.
+    /// Merge and persist its complete snapshot away from the main thread,
+    /// retaining every existing Firefox, Apple, Google and local entry.
+    @discardableResult func mergeImported(_ incoming: [VaultCredential]) async throws -> Int {
+        let old = entries
+        let combined = try await Task.detached(priority: .utility) {
+            var result = old
+            var positions: [String: Int] = [:]
+            for (index, existing) in result.enumerated() {
+                positions[existing.identity] = index
+            }
+            for var entry in incoming {
+                if let index = positions[entry.identity] {
+                    entry.id = result[index].id
+                    result[index] = entry
+                } else {
+                    positions[entry.identity] = result.count
+                    result.append(entry)
+                }
+            }
+            try KeychainVault.write(result)
+            return result
+        }.value
+        entries = combined
+        registerAutoFillIdentities(combined)
+        return incoming.count
+    }
+
     func remove(_ entry: VaultCredential) {
         let remaining = entries.filter { $0.id != entry.id }
         do {
