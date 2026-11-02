@@ -62,6 +62,8 @@ nonisolated enum SyncStorageError: Error, LocalizedError {
     case keysUnavailable
     case serverBackoff(Int)
     case conflict
+    case paginationStalled
+    case tooManyRecords(Int)
 
     var errorDescription: String? {
         switch self {
@@ -79,6 +81,10 @@ nonisolated enum SyncStorageError: Error, LocalizedError {
             return "The Sync server asked Reynard to wait \(seconds) seconds before syncing again."
         case .conflict:
             return "Another device changed your data during the sync. It will be retried."
+        case .paginationStalled:
+            return "Firefox Sync returned a repeated page. Existing passwords were kept; try again later."
+        case let .tooManyRecords(limit):
+            return "Firefox Sync has more than \(limit) records. Existing passwords were kept to avoid a partial overwrite."
         }
     }
 }
@@ -251,6 +257,7 @@ final class SyncStorageClient {
     ) async throws -> CollectionResult {
         var records: [SyncBSO] = []
         var offset: String?
+        var seenOffsets: Set<String> = []
         var lastModified: Double = 0
 
         repeat {
@@ -282,7 +289,15 @@ final class SyncStorageClient {
             let page = (response.jsonArray() ?? []).compactMap(SyncBSO.init(json:))
             records.append(contentsOf: page)
             offset = response.header("X-Weave-Next-Offset")
+            if let offset, !seenOffsets.insert(offset).inserted {
+                throw SyncStorageError.paginationStalled
+            }
         } while offset != nil && records.count < maxRecords
+
+        if offset != nil {
+            // Never replace a complete local vault with a truncated download.
+            throw SyncStorageError.tooManyRecords(maxRecords)
+        }
 
         if lastModified == 0 {
             lastModified = records.map(\.modified).max() ?? 0

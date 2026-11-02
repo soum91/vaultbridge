@@ -3,13 +3,28 @@ import Foundation
 
 @MainActor final class VaultModel: ObservableObject {
     @Published private(set) var entries: [VaultCredential] = []
+    @Published private(set) var isLoading = true
     @Published var lastError: String?
 
-    init() { reload() }
+    init() {
+        // Never synchronously deserialize a large password vault while
+        // SwiftUI is creating the root screen. A previous Sync download
+        // could otherwise leave the launch window completely black.
+        Task { await reload() }
+    }
 
-    func reload() {
-        do { entries = try KeychainVault.read() }
-        catch { lastError = error.localizedDescription }
+    func reload() async {
+        let result = await Task.detached(priority: .userInitiated) {
+            Result { try KeychainVault.read() }
+        }.value
+        switch result {
+        case .success(let restored):
+            entries = restored
+            lastError = nil
+        case .failure(let error):
+            lastError = error.localizedDescription
+        }
+        isLoading = false
     }
 
     @discardableResult func merge(_ incoming: [VaultCredential]) -> Int {
@@ -45,18 +60,23 @@ import Foundation
     // after the server response and every record have been verified.
     @discardableResult func replaceFirefoxSynced(
         _ downloaded: [VaultCredential], accountID: String
-    ) throws -> Int {
+    ) async throws -> Int {
         let old = entries
-        var replacement: [VaultCredential] = old.filter {
-            !($0.source == .firefox && $0.sourceAccount == accountID)
-        }
-        for var login in downloaded {
-            if let matching = old.first(where: { $0.identity == login.identity }) {
-                login.id = matching.id
+        // Keep JSON encoding and Keychain writes off the UI thread, and use
+        // a lookup map instead of scanning all logins for every Sync record.
+        let replacement = try await Task.detached(priority: .utility) {
+            let oldIDs = Dictionary(old.map { ($0.identity, $0.id) },
+                                    uniquingKeysWith: { first, _ in first })
+            var result = old.filter {
+                !($0.source == .firefox && $0.sourceAccount == accountID)
             }
-            replacement.append(login)
-        }
-        try KeychainVault.write(replacement)
+            for var login in downloaded {
+                if let id = oldIDs[login.identity] { login.id = id }
+                result.append(login)
+            }
+            try KeychainVault.write(result)
+            return result
+        }.value
         entries = replacement
         registerAutoFillIdentities(replacement)
         return downloaded.count

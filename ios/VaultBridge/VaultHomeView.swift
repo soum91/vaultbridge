@@ -86,8 +86,8 @@ struct VaultCredentialView: View {
 struct VaultHomeView: View {
     @StateObject private var vault = VaultModel()
     @StateObject private var firefox = FirefoxSyncService()
-    @Environment(\.scenePhase) private var currentScenePhase
     @State private var search = ""
+    @State private var visiblePasswordLimit = 100
     @State private var chosenProvider: CredentialSource?
     @State private var selectedImportSource: CredentialSource = .apple
     @State private var accountLabel = ""
@@ -144,7 +144,9 @@ struct VaultHomeView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            heading("Passwords", "\(vault.entries.count) stored on this iPhone")
+                            heading("Passwords", vault.isLoading
+                                    ? "Loading saved passwords…"
+                                    : "\(vault.entries.count) stored on this iPhone")
                             Spacer()
                             Button { showingAdd = true } label: {
                                 Image(systemName: "plus")
@@ -153,9 +155,14 @@ struct VaultHomeView: View {
                                     .background(Color.accentColor.opacity(0.12), in: Circle())
                             }
                             .accessibilityLabel("Add a password")
+                            .disabled(vault.isLoading)
                         }
                         VStack(spacing: 0) {
-                            if vault.entries.isEmpty {
+                            if vault.isLoading {
+                                ProgressView("Unlocking saved passwords…")
+                                    .frame(maxWidth: .infinity)
+                                    .padding(24)
+                            } else if vault.entries.isEmpty {
                                 VStack(spacing: 8) {
                                     Image(systemName: "key.horizontal")
                                         .font(.title2)
@@ -183,32 +190,39 @@ struct VaultHomeView: View {
                                         .foregroundStyle(.secondary)
                                         .padding(18)
                                 }
-                                ForEach(filtered) { entry in
-                                    NavigationLink {
-                                        VaultCredentialView(entry: entry) { vault.remove(entry) }
-                                    } label: {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: "key.fill")
-                                                .foregroundStyle(.secondary)
-                                                .frame(width: 24)
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(entry.title).font(.body.weight(.medium))
-                                                Text(entry.username)
-                                                    .font(.caption)
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(filtered.prefix(visiblePasswordLimit))) { entry in
+                                        NavigationLink {
+                                            VaultCredentialView(entry: entry) { vault.remove(entry) }
+                                        } label: {
+                                            HStack(spacing: 12) {
+                                                Image(systemName: "key.fill")
                                                     .foregroundStyle(.secondary)
-                                                    .lineLimit(1)
+                                                    .frame(width: 24)
+                                                VStack(alignment: .leading, spacing: 3) {
+                                                    Text(entry.title).font(.body.weight(.medium))
+                                                    Text(entry.username)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption)
+                                                    .foregroundStyle(.tertiary)
                                             }
-                                            Spacer()
-                                            Image(systemName: "chevron.right")
-                                                .font(.caption)
-                                                .foregroundStyle(.tertiary)
+                                            .foregroundStyle(.primary)
+                                            .padding(16)
                                         }
-                                        .foregroundStyle(.primary)
-                                        .padding(16)
-                                    }
-                                    if entry.id != filtered.last?.id {
                                         Divider().padding(.leading, 52)
                                     }
+                                }
+                                if filtered.count > visiblePasswordLimit {
+                                    Button("Show next 100 passwords") {
+                                        visiblePasswordLimit += 100
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(16)
                                 }
                             }
                         }
@@ -242,10 +256,6 @@ struct VaultHomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { refreshFirefoxIfConnected() }
-            .onChange(of: currentScenePhase) { _, phase in
-                if phase == .active { refreshFirefoxIfConnected() }
-            }
             .sheet(item: $chosenProvider) { source in
                 providerDetails(source)
                     .presentationDetents([.medium, .large])
@@ -310,14 +320,6 @@ struct VaultHomeView: View {
         }
     }
 
-    private func refreshFirefoxIfConnected() {
-        guard firefox.isSignedIn, !firefox.isRefreshing else { return }
-        Task {
-            // Network outages should not erase a valid previously synced vault.
-            _ = try? await firefox.refresh(into: vault)
-        }
-    }
-
     private func startFirefoxLogin() {
         Task {
             do {
@@ -377,8 +379,10 @@ struct VaultHomeView: View {
             Task {
                 do {
                     try await firefox.finishSignIn(code: code, state: state)
-                    let count = try await firefox.refresh(into: vault)
-                    showFirefoxResult("Mozilla account connected. Downloaded \(count) Firefox passwords.")
+                    // Dismiss the account browser as soon as sign-in succeeds.
+                    // Sync can be expensive and must never strand this sheet
+                    // as a black screen or block subsequent app launches.
+                    showFirefoxResult("Mozilla account connected. Open Firefox and tap Sync Firefox passwords now when ready.")
                 } catch {
                     showFirefoxResult(error.localizedDescription)
                 }
@@ -439,7 +443,7 @@ struct VaultHomeView: View {
                     if firefox.isSignedIn {
                         Button("Sync Firefox passwords now") { syncFirefoxNow() }
                             .buttonStyle(.borderedProminent)
-                            .disabled(firefox.isRefreshing)
+                            .disabled(firefox.isRefreshing || vault.isLoading)
                         Button("Sign out of Mozilla") {
                             Task {
                                 await firefox.signOut()

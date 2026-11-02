@@ -209,11 +209,26 @@ import Security
         } else {
             throw SyncStorageError.keysUnavailable
         }
-        let passwordsKey = try SyncKeyBundle(base64Pair: keyPair)
         let collection = try await client.getCollection(
             "passwords", pageSize: 1000, maxRecords: 20000)
+        let accountID = current.accountID
+        // AES/HMAC verification of thousands of passwords must not run on
+        // the MainActor, or the account sheet and home screen can freeze.
+        let updated = try await Task.detached(priority: .utility) {
+            try Self.decryptPasswords(collection.records, keyPair: keyPair, accountID: accountID)
+        }.value
+        let count = try await vault.replaceFirefoxSynced(updated, accountID: accountID)
+        lastSync = Date()
+        return count
+    }
+
+    nonisolated private static func decryptPasswords(
+        _ records: [SyncBSO], keyPair: [String], accountID: String
+    ) throws -> [VaultCredential] {
+        let passwordsKey = try SyncKeyBundle(base64Pair: keyPair)
         var updated: [VaultCredential] = []
-        for record in collection.records {
+        updated.reserveCapacity(records.count)
+        for record in records {
             let json: [String: Any]
             do { json = try passwordsKey.decrypt(payload: record.payload) }
             catch { throw SyncError.invalidRecord }
@@ -228,7 +243,7 @@ import Security
                   let password = json["password"] as? String,
                   !password.isEmpty else { continue }
             updated.append(VaultCredential(
-                id: UUID(), source: .firefox, sourceAccount: current.accountID,
+                id: UUID(), source: .firefox, sourceAccount: accountID,
                 origin: origin, title: host,
                 username: json["username"] as? String ?? "",
                 password: password, note: "",
@@ -237,9 +252,7 @@ import Security
                 remoteID: record.id
             ))
         }
-        let count = try vault.replaceFirefoxSynced(updated, accountID: current.accountID)
-        lastSync = Date()
-        return count
+        return updated
     }
 
     func signOut() async {

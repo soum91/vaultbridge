@@ -14,6 +14,14 @@ advertise unfinished connection features as working. Test the installed IPA
 visually, not just Xcode compilation. The original VaultBridge oversized form
 and EmberTV's clipped layout are explicit regressions to prevent.
 
+Never block the root view on Keychain vault decoding, OAuth exchange, bulk
+Firefox Sync decryption, or writes. Mozilla sign-in must dismiss independently
+of password download; syncing runs only when explicitly requested until device
+testing proves the background lifecycle safe. Render stored passwords in a lazy,
+bounded list. A broken or stalled sync must leave account management and local
+passwords accessible on every relaunch. Do not delete/reinstall the app as a
+generic recovery step: device-only Keychain credentials and sessions can be lost.
+
 ### Expected account behavior
 
 The desired product is **sign in and automatically fetch passwords**, especially
