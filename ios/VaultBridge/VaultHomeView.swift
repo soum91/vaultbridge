@@ -373,9 +373,16 @@ struct VaultHomeView: View {
         for account in export.accounts {
             let accountLabel = account.email.isEmpty ? "Apple Passwords" : account.email
             for item in account.items {
-                guard let url = item.scope?.urls.first(where: {
-                    ["https", "http"].contains($0.scheme?.lowercased() ?? "") && $0.host != nil
-                }) else {
+                let candidateURLs = item.scope?.urls ?? []
+                var websiteURL: URL?
+                for candidate in candidateURLs {
+                    let scheme = candidate.scheme?.lowercased()
+                    if (scheme == "https" || scheme == "http") && candidate.host != nil {
+                        websiteURL = candidate
+                        break
+                    }
+                }
+                guard let url = websiteURL else {
                     skipped += item.credentials.count
                     continue
                 }

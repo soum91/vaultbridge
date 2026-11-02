@@ -20,11 +20,19 @@ concurrency:
 
 jobs:
   ios:
-    runs-on: macos-15
+    # Credential Exchange APIs require the iOS 26 SDK. macOS 15 defaults to
+    # Xcode 16.4 (iOS 18 SDK), even when newer Xcodes are installed.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Verify iOS 26 SDK
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          SDK_MAJOR="$(xcrun --sdk iphoneos --show-sdk-version | cut -d. -f1)"
+          test "$SDK_MAJOR" -ge 26
       - name: Set version
         id: version
         shell: bash
