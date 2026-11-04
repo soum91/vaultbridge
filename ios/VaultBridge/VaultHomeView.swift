@@ -314,6 +314,14 @@ struct VaultHomeView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { refreshTOTPAccounts() }
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 20_000_000_000)
+                    if !Task.isCancelled && !totpAccounts.isEmpty {
+                        try? TOTPCodeCache.refresh(totpAccounts)
+                    }
+                }
+            }
             .onOpenURL { url in
                 do {
                     try OTPInbox.capture(url: url)

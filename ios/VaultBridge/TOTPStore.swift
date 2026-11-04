@@ -53,7 +53,8 @@ struct TOTPAccount: Codable, Identifiable, Hashable {
             | (UInt32(digest[offset + 2]) << 8)
             | UInt32(digest[offset + 3])
         let modulus = UInt32(pow(10.0, Double(digits)))
-        return String(format: "%0*u", digits, value % modulus)
+        let raw = String(value % modulus)
+        return String(repeating: "0", count: max(0, digits - raw.count)) + raw
     }
 
     func matches(services: [String]) -> Bool {
@@ -78,7 +79,9 @@ struct TOTPAccount: Codable, Identifiable, Hashable {
             let issuer = query["issuer"].flatMap { $0.isEmpty ? nil : $0 } ??
                 (labelParts.count > 1 ? labelParts[0] : fallbackIssuer)
             let account = labelParts.last.flatMap { $0.isEmpty ? nil : $0 } ?? fallbackAccount
-            let algorithm = TOTPAlgorithm(rawValue: (query["algorithm"] ?? "SHA1").uppercased()) ?? .sha1
+            guard let algorithm = TOTPAlgorithm(rawValue: (query["algorithm"] ?? "SHA1").uppercased()) else {
+                throw TOTPError.invalidParameters
+            }
             let digits = Int(query["digits"] ?? "6") ?? 6
             let period = Int(query["period"] ?? "30") ?? 30
             let result = TOTPAccount(issuer: issuer, accountName: account,
@@ -126,9 +129,10 @@ enum TOTPSecretVault {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(request as CFDictionary, &result)
         if status == errSecItemNotFound { return [] }
-        guard status == errSecSuccess, let data = result as? Data,
+        guard status == errSecSuccess else { throw TOTPError.keychain(status) }
+        guard let data = result as? Data,
               let accounts = try? JSONDecoder().decode([TOTPAccount].self, from: data) else {
-            throw TOTPError.keychain(status)
+            throw TOTPError.invalidStoredData
         }
         return accounts
     }
@@ -200,11 +204,12 @@ enum TOTPCodeCache {
 }
 
 enum TOTPError: LocalizedError {
-    case invalidSecret, invalidParameters, keychain(OSStatus), sharedContainerUnavailable
+    case invalidSecret, invalidParameters, invalidStoredData, keychain(OSStatus), sharedContainerUnavailable
     var errorDescription: String? {
         switch self {
         case .invalidSecret: return "Use a valid Base32 secret or otpauth://totp link."
-        case .invalidParameters: return "Authenticator must use 6–8 digits and a 15–120 second period."
+        case .invalidParameters: return "Authenticator must use a supported algorithm, 6–8 digits, and a 15–120 second period."
+        case .invalidStoredData: return "Stored authenticator data could not be decoded."
         case .keychain(let code): return "Keychain could not save or read authenticator entries (\(code))."
         case .sharedContainerUnavailable: return "Aukkhor's shared code container is unavailable. Check app-group signing."
         }
@@ -235,8 +240,10 @@ struct AddTOTPAccountView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        do { onSave(try TOTPAccount.parse(secretInput, issuer: issuer, account: accountName)) }
-                        catch { errorText = error.localizedDescription }
+                        do {
+                            onSave(try TOTPAccount.parse(secretInput, issuer: issuer, account: accountName))
+                            dismiss()
+                        } catch { errorText = error.localizedDescription }
                     }.disabled(secretInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }

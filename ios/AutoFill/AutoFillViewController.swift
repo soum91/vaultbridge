@@ -80,8 +80,13 @@ final class AutoFillViewController: ASCredentialProviderViewController {
             try TOTPCodeCache.refresh(accounts)
             var options: [(String, String)] = []
             if let code = OTPInbox.latestCode() { options.append(("SMS verification code", code)) }
-            for account in accounts where domains.isEmpty || account.matches(services: domains) {
-                if let code = try? account.currentCode() { options.append(("\(account.issuer) · \(account.accountName)", code)) }
+            let ordered = accounts.sorted { first, second in
+                first.matches(services: domains) && !second.matches(services: domains)
+            }
+            for account in ordered {
+                if let code = try? account.currentCode() {
+                    options.append(("\(account.issuer) · \(account.accountName)", code))
+                }
             }
             guard !options.isEmpty else {
                 let alert = UIAlertController(title: "VaultBridge", message: "No available verification codes", preferredStyle: .alert)
