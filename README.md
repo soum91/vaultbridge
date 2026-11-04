@@ -97,4 +97,4 @@ This source milestone deliberately never claims a source is synchronized when it
 
 For SMS capture, configure a Messages automation in Shortcuts to open `vaultbridge://otp?code=[Message]`. VaultBridge accepts one unambiguous 4–10 digit run and stores only that code in the shared Aukkhor app-group container. The code expires after five minutes and is deleted when Aukkhor fills it from its one-time-code suggestion. No password records or VaultBridge password Keychain items are shared with Aukkhor, and this flow does not upload the code.
 
-Both apps need to be signed by the same Apple team with the Aukkhor app-group entitlement available in their provisioning profiles. This feature is a temporary SMS-code handoff; stored TOTP accounts and VaultBridge OTP AutoFill are not implemented yet.
+Both apps need to be signed by the same Apple team with the Aukkhor app-group entitlement available in their provisioning profiles. VaultBridge stores TOTP secrets in its protected Keychain group. Its credential provider supplies rotating codes to iOS AutoFill, and Aukkhor receives only generated, expiring codes through the shared app-group container.

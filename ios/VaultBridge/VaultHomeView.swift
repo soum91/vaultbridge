@@ -98,6 +98,8 @@ struct VaultHomeView: View {
     @State private var importingApplePasswords = false
     @State private var firefoxLogin: FirefoxLoginRequest?
     @State private var alertText: String?
+    @State private var totpAccounts: [TOTPAccount] = []
+    @State private var showingAddTOTP = false
 
     private var filtered: [VaultCredential] {
         vault.entries.filter {
@@ -232,12 +234,45 @@ struct VaultHomeView: View {
                                     in: RoundedRectangle(cornerRadius: 19))
                     }
 
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            heading("Authenticator codes", "\(totpAccounts.count) stored securely in VaultBridge")
+                            Spacer()
+                            Button { showingAddTOTP = true } label: {
+                                Image(systemName: "plus")
+                                    .font(.body.bold())
+                                    .frame(width: 40, height: 40)
+                                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                            }
+                            .accessibilityLabel("Add an authenticator account")
+                        }
+                        if totpAccounts.isEmpty {
+                            Text("Add a setup key or paste an otpauth://totp link. Codes rotate automatically and can be filled by AutoFill or Aukkhor.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(16)
+                                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(totpAccounts) { account in
+                                    TOTPCodeRow(account: account) {
+                                        do { try TOTPSecretVault.remove(account); refreshTOTPAccounts() }
+                                        catch { alertText = error.localizedDescription }
+                                    }
+                                    if account.id != totpAccounts.last?.id { Divider().padding(.leading, 16) }
+                                }
+                            }
+                            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+
                     VStack(alignment: .leading, spacing: 10) {
                         heading("OTP inbox", "Short-lived codes shared with Aukkhor")
                         VStack(alignment: .leading, spacing: 8) {
                             Label("Codes expire automatically after 5 minutes", systemImage: "clock.badge.checkmark")
                                 .font(.subheadline)
-                            Text("Create a Messages automation in Shortcuts and open: vaultbridge://otp?code= followed by the message code. VaultBridge stores it in the shared Keychain inbox; Aukkhor can fill it from the keyboard suggestion bar.")
+                            Text("Create a Messages automation in Shortcuts and open: vaultbridge://otp?code= followed by the message code. VaultBridge stores it in the protected shared app-group inbox; Aukkhor can fill it from the keyboard suggestion bar.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -278,12 +313,20 @@ struct VaultHomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { refreshTOTPAccounts() }
             .onOpenURL { url in
                 do {
                     try OTPInbox.capture(url: url)
                     alertText = "Verification code received. It is stored temporarily and available to Aukkhor."
                 } catch {
                     alertText = error.localizedDescription
+                }
+            }
+            .sheet(isPresented: $showingAddTOTP) {
+                AddTOTPAccountView { account in
+                    do { try TOTPSecretVault.add(account); refreshTOTPAccounts() }
+                    catch { alertText = error.localizedDescription }
+                    showingAddTOTP = false
                 }
             }
             .onContinueUserActivity(credentialExchangeActivity) { activity in
@@ -346,6 +389,13 @@ struct VaultHomeView: View {
                 Text(alertText ?? vault.lastError ?? "")
             }
         }
+    }
+
+    private func refreshTOTPAccounts() {
+        do {
+            totpAccounts = try TOTPSecretVault.read()
+            try TOTPCodeCache.refresh(totpAccounts)
+        } catch { alertText = error.localizedDescription }
     }
 
     private func heading(_ title: String, _ subtitle: String) -> some View {

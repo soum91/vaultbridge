@@ -49,6 +49,8 @@ targets:
       - path: AutoFill
       - path: VaultBridge/Models.swift
       - path: VaultBridge/KeychainVault.swift
+      - path: VaultBridge/OTPInbox.swift
+      - path: VaultBridge/TOTPStore.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.soum91.vaultbridge.autofill
