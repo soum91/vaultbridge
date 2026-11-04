@@ -233,6 +233,22 @@ struct VaultHomeView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
+                        heading("OTP inbox", "Short-lived codes shared with Aukkhor")
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Codes expire automatically after 5 minutes", systemImage: "clock.badge.checkmark")
+                                .font(.subheadline)
+                            Text("Create a Messages automation in Shortcuts and open: vaultbridge://otp?code= followed by the message code. VaultBridge stores it in the shared Keychain inbox; Aukkhor can fill it from the keyboard suggestion bar.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground),
+                                    in: RoundedRectangle(cornerRadius: 16))
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
                         heading("Tools", "Existing exports and backups")
                         if importingApplePasswords {
                             ProgressView("Receiving passwords from Apple…")
@@ -262,6 +278,14 @@ struct VaultHomeView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .toolbar(.hidden, for: .navigationBar)
+            .onOpenURL { url in
+                do {
+                    try OTPInbox.capture(url: url)
+                    alertText = "Verification code received. It is stored temporarily and available to Aukkhor."
+                } catch {
+                    alertText = error.localizedDescription
+                }
+            }
             .onContinueUserActivity(credentialExchangeActivity) { activity in
                 if #available(iOS 26.0, *) {
                     receiveApplePasswords(activity)

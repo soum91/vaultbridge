@@ -17,6 +17,10 @@ targets:
       path: VaultBridge/Info.generated.plist
       properties:
         CFBundleDisplayName: VaultBridge
+        CFBundleURLTypes:
+          - CFBundleURLName: com.soum91.vaultbridge
+            CFBundleURLSchemes:
+              - vaultbridge
         NSFaceIDUsageDescription: Authenticate to reveal or autofill stored credentials.
         NSUserActivityTypes:
           - ASCredentialExchangeActivityType
