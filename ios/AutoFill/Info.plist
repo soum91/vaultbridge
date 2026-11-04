@@ -16,7 +16,6 @@
   <key>NSExtensionAttributes</key><dict>
     <key>ASCredentialProviderExtensionCapabilities</key><dict>
       <key>ProvidesPasswords</key><true/>
-      <key>ProvidesOneTimeCodes</key><true/>
       <key>SupportsCredentialExchange</key><true/>
       <key>SupportedCredentialExchangeVersions</key><array><string>1.0</string></array>
     </dict>
