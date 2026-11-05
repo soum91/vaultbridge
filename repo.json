@@ -16,6 +16,16 @@
       "iconURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/ios/VaultBridge/Assets.xcassets/AppIcon.appiconset/Icon-1024.png",
       "versions": [
         {
+          "version": "0.1.0.19",
+          "buildVersion": "19",
+          "date": "2026-11-05",
+          "localizedDescription": "* Fix AutoFill compile: read unexpired shared OTP inbox codes\n* Harden TOTP parsing and refresh Aukkhor code cache\n* Add TOTP storage and one-time-code AutoFill\n* Document temporary OTP handoff and privacy boundary\n* Keep password AutoFill in VaultBridge Keychain group\n* Isolate VaultBridge passwords from Aukkhor\n* Isolate short-lived OTP inbox from password Keychain\n* Keep unsupported OTP AutoFill capability disabled\n* Advertise one-time code AutoFill support\n* Add temporary OTP inbox for Aukkhor keyboard\n* catalog: publish VaultBridge 0.1.0.11",
+          "changelog": "* Fix AutoFill compile: read unexpired shared OTP inbox codes\n* Harden TOTP parsing and refresh Aukkhor code cache\n* Add TOTP storage and one-time-code AutoFill\n* Document temporary OTP handoff and privacy boundary\n* Keep password AutoFill in VaultBridge Keychain group\n* Isolate VaultBridge passwords from Aukkhor\n* Isolate short-lived OTP inbox from password Keychain\n* Keep unsupported OTP AutoFill capability disabled\n* Advertise one-time code AutoFill support\n* Add temporary OTP inbox for Aukkhor keyboard\n* catalog: publish VaultBridge 0.1.0.11",
+          "downloadURL": "https://github.com/soum91/vaultbridge/releases/download/vaultbridge-v0.1.0.19/VaultBridge.ipa",
+          "size": 632717,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "0.1.0.11",
           "buildVersion": "11",
           "date": "2026-11-02",
