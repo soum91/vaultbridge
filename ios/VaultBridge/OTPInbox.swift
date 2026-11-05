@@ -41,6 +41,24 @@ enum OTPInbox {
         try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
+    /// Read a valid, unexpired Shortcuts code from the shared App Group.
+    /// AutoFill calls this after device authentication.
+    static func latestCode(now: Date = Date()) -> String? {
+        guard let directory = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: group) else { return nil }
+        let url = directory.appendingPathComponent(filename, isDirectory: false)
+        guard let data = try? Data(contentsOf: url),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data)
+        else { return nil }
+        guard envelope.expiresAt > now else {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        guard (4...10).contains(envelope.code.count),
+              envelope.code.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
+        return envelope.code
+    }
+
     enum InboxError: LocalizedError {
         case invalidLink
         case invalidCode
