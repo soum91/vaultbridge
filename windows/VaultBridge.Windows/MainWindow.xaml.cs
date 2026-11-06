@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InstalledVersionLabel.Text = $"Installed version {System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false).OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown"}";
         CredentialList.ItemsSource = entries;
         ICollectionView view = CollectionViewSource.GetDefaultView(entries);
         view.Filter = Filter;
