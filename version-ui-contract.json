@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "name": "iPhone app",
+      "evidence": [
+        {
+          "path": "ios/VaultBridge/VaultHomeView.swift",
+          "contains": [
+            "Installed version",
+            "CFBundleShortVersionString",
+            "CFBundleVersion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Windows app",
+      "evidence": [
+        {
+          "path": "windows/VaultBridge.Windows/MainWindow.xaml",
+          "contains": [
+            "InstalledVersionLabel"
+          ]
+        },
+        {
+          "path": "windows/VaultBridge.Windows/MainWindow.xaml.cs",
+          "contains": [
+            "InstalledVersionLabel.Text",
+            "AssemblyInformationalVersionAttribute"
+          ]
+        }
+      ]
+    }
+  ]
+}
