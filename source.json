@@ -16,6 +16,16 @@
       "iconURL": "https://raw.githubusercontent.com/soum91/vaultbridge/main/ios/VaultBridge/Assets.xcassets/AppIcon.appiconset/Icon-1024.png",
       "versions": [
         {
+          "version": "0.1.0.21",
+          "buildVersion": "21",
+          "date": "2026-11-06",
+          "localizedDescription": "* Enforce visible installed version/build across app releases\n* catalog: publish VaultBridge 0.1.0.20",
+          "changelog": "* Enforce visible installed version/build across app releases\n* catalog: publish VaultBridge 0.1.0.20",
+          "downloadURL": "https://github.com/soum91/vaultbridge/releases/download/vaultbridge-v0.1.0.21/VaultBridge.ipa",
+          "size": 633839,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "0.1.0.20",
           "buildVersion": "20",
           "date": "2026-11-06",
